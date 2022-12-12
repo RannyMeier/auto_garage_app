@@ -1,0 +1,179 @@
+<template>
+    <div v-if="addNewVehicle">
+        <div id="modal">
+            <div class="modal-content">
+                <div class="pageHeading">
+                    Add New Vehicle<span class="closeModal pull-right" @click="hide">&times;</span>
+                </div>
+                <div class="formHeadingFooter p1">
+                    <span>{{currentTime}}</span>
+                    <span>{{currentDate}}</span>
+                </div>
+                <h4 v-if="addNew" style="color: darkgreen;">Successfully added new entry. Please stay and we will redirect you.</h4>
+                <strong class="p-2">Fields marked with red stars are required fields.</strong>
+                <form class="formBody">
+                    <div class="row">
+                        <div class="col-6">
+                            <label style="width: 45%;">Select customer<span class="req">*</span>: </label>
+                            <select v-model="selectedCustomerId" @click="selectCustomer" :disabled="disableCustomerSelection">
+                                <option v-for="item in allCustomerList" v-bind:key="item.id" :value="item.id">
+                                    {{item.first_name}} {{item.last_name}}
+                                </option>
+                            </select>
+                            <br/>
+                            <label>License<span class="req">*</span>: </label> <input type="text" name="license" v-model="formFields.license"/> <br/>
+                            <br/>
+                            <label>State<span class="req">*</span>: </label> <input type="text" name="state" v-model="formFields.state"/> <br/>
+                            <br/>
+                            <label style="width: 45%;">Select Model<span class="req">*</span>: </label>
+                            <select v-model="formFields.make_model_id">
+                                <option v-for="item in allModelList" v-bind:key="item.id" :value="item.id">
+                                    {{item.model_name}}
+                                </option>
+                            </select>                            
+                            <br/>
+                            <label>Vehicle ID Number<span class="req">*</span>: </label> <input type="text" name="vehicle_num" v-model="formFields.vehicle_num"/>  <br/>
+                        </div>
+                        <div class="col-6">
+                            <label>Year: </label> <input type="text" name="year" v-model="formFields.year"/> <br/>
+                            <label>Paint Color: </label> <input type="text" name="paint_color" v-model="formFields.paint_color"/>  <br/>
+                            <label>Paint Numbers: </label> <input type="text" name="paint_number" v-model="formFields.paint_number"/> <br/>
+                            <label>Manufacture Date: </label> <input type="number" name="manufacture_date" v-model="formFields.manufacture_date"/>  <br/>
+                            <label>Miles: </label> <input type="text" name="miles" v-model="formFields.miles"/>
+                        </div> 
+                    </div>
+                    <hr/>
+                    <div class="p-3">
+                        <button class="btn btn-link" @click="hide">Cancel</button>
+                        <button class="btn btn-primary btn-sm" @click.prevent="submit" :disabled="disableSubmitButton"> Submit</button>
+                    </div>
+                    <small v-if="submitFailed" style="color:red;">Something went wrong. Please try again. If problem persists, contact developer.</small>
+                </form>    
+            </div>
+        </div> 
+    </div>
+</template>
+
+<script>
+    import moment from 'moment';
+    import axios from 'axios';
+
+    export default {
+        name: "AddNewVehicle",
+        props:{
+            sendBackId :{
+                required: false
+            },
+            customerId :{
+                required: false,
+            }
+        },
+        data() {
+            return {
+                addNewVehicle: false,
+                currentDate: '',
+                currentTime: '',
+                submitFailed: false,
+                vehicleId: 0,
+                allCustomerList: [],
+                allModelList: [],
+                selectedCustomerId: '',
+                formFields: {
+                    cust_id: '',
+                    license: '',
+                    state: '',
+                    make_model_id: '',
+                    year: '',
+                    paint_color: '',
+                    paint_number: '',
+                    vehicle_num: '',
+                    manufacture_date: '',
+                    miles: '',
+                },
+                addNew: false,
+            }
+        },
+        async mounted(){
+            this.currentDate = moment().format('MMM DD, YYYY');
+            this.currentTime = moment().format('HH:MM A');
+            await this.getAllCustomers();
+            await this.getAllModelNames();
+        },
+        computed:{
+            disableSubmitButton() {
+                return this.formFields.cust_id == '' || this.formFields.license == '' || this.formFields.state == '' || this.formFields.make_model_id == '' || this.formFields.vehicle_num == '';
+            },
+            disableCustomerSelection() {
+                return this.customerId !== undefined;
+            }
+        },
+        methods: {
+            async selectCustomer() {
+                this.formFields.cust_id = this.disableCustomerSelection ? this.customerId : this.selectedCustomerId;
+            },
+            async getAllModelNames() {
+                try {
+                    const response = await axios.get(`getAllModelNames`);
+                    this.allModelList = response.data;
+                } catch(exception) {
+                    console.log("exception: ", exception)
+                }
+            },
+            async getAllCustomers() {
+                try {
+                    const response = await axios.get(`getAllCustomers`);
+                    this.allCustomerList = response.data;
+                } catch(exception) {
+                    console.log("exception: ", exception)
+                }
+            },
+            async submit() {
+                this.submitFailed = false;
+                try {
+                    const response = await axios.post(`/addNewVehicle`,this.formFields);
+                    this.vehicleId = response.data;
+                } catch (exception) {
+                    this.submitFailed = true;
+                }
+                
+                if(this.submitFailed == false) {
+                    var self = this;
+                    Object.keys(self.formFields).forEach(function(key,index) {
+                        if(typeof self.formFields[key] === "string") 
+                            self.formFields[key] = ''; 
+                        else if (typeof self.formFields[key] === "boolean") 
+                            self.formFields[key] = false;
+                        else {
+                            self.formFields[key] = '';
+                        } 
+                    });
+
+                    this.addNew = true;
+                    this.hide();
+                }
+            },
+            show() {
+                this.selectedCustomerId = this.customerId !== undefined ? this.customerId : '';
+                this.formFields.cust_id = this.customerId !== undefined ? this.customerId : this.selectedCustomerId;
+                this.addNewVehicle = true;
+            },
+            hide() {
+                if(this.addNew) {
+                    setTimeout(() => {
+                        this.addNewVehicle = false;
+                        if(this.sendBackId == true || this.sendBackId == "true") {
+                            this.$emit('vehicle:id', this.vehicleId);
+                        }
+                        this.$emit('reload:vehicle');
+                    }, 5000);
+                } else {
+                    this.addNewVehicle = false;
+                    if(this.sendBackId == true || this.sendBackId == "true") {
+                        this.$emit('vehicle:id', this.vehicleId);
+                    }
+                    this.$emit('reload:vehicle');
+                } 
+            }
+        }
+    }
+</script>
